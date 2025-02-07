@@ -2,7 +2,7 @@ use std::fmt;
 
 use bevy::prelude::{reflect_trait, Commands, Component, Entity};
 
-use dogoap::prelude::{Action, Compare, Datum, Mutator};
+use dogoap::prelude::{Action, Compare, Datum, LocalState, Mutator};
 
 /// A [`Component`] that can insert/remove itself to/from an Entity
 /// Used for adding/removing current [`Action`] our planner tells us to perform
@@ -51,10 +51,13 @@ impl fmt::Debug for dyn InserterComponent {
 /// )
 /// ```
 #[bevy_trait_query::queryable]
-#[reflect_trait]
 pub trait DatumComponent: Send + Sync {
     fn field_key(&self) -> String;
     fn field_value(&self) -> Datum;
+}
+
+pub trait DatumKey {
+    fn key() -> String;
 }
 
 /// ActionComponent allows you to create Actions directly from your action struct
@@ -86,7 +89,6 @@ pub trait DatumComponent: Send + Sync {
 /// struct Thirst(f64);
 /// ```
 #[bevy_trait_query::queryable]
-#[reflect_trait]
 pub trait ActionComponent: Send + Sync {
     /// Gets the action key but in snake_case ("AtLocation" becomes "at_location")
     fn key() -> String

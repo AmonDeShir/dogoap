@@ -60,7 +60,6 @@ pub fn datum_component_derive(input: TokenStream) -> TokenStream {
     };
 
     let gen = quote! {
-
         impl DatumComponent for #name {
             fn field_key(&self) -> String {
                 #snake_case_name.to_owned()
@@ -71,8 +70,8 @@ pub fn datum_component_derive(input: TokenStream) -> TokenStream {
             }
         }
 
-        impl #name {
-            pub fn key() -> String {
+        impl DatumKey for #name {
+            fn key() -> String {
                 #snake_case_name.to_owned()
             }
         }
@@ -162,7 +161,6 @@ pub fn enum_component_derive(input: TokenStream) -> TokenStream {
     };
 
     let gen = quote! {
-
         impl DatumComponent for #name {
             fn field_key(&self) -> String {
                 #snake_case_name.to_owned()
@@ -173,8 +171,8 @@ pub fn enum_component_derive(input: TokenStream) -> TokenStream {
             }
         }
 
-        impl #name {
-            pub fn key() -> String {
+        impl DatumKey for #name {
+            fn key() -> String {
                 #snake_case_name.to_owned()
             }
         }

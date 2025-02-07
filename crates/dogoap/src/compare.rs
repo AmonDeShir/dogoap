@@ -58,7 +58,7 @@ pub fn compare_values(comparison: &Compare, value: &Datum) -> bool {
 /// Checks all the preconditions from the `Action` against passed in `LocalState`
 /// Returns `true` if all the preconditions pass (or if there is none), otherwise `false`
 pub fn check_preconditions(state: &LocalState, action: &Action) -> bool {
-    action.preconditions.iter().all(|(key, value)| {
+    action.get_preconditions(state).iter().all(|(key, value)| {
         let state_value = state
             .data
             .get(key)

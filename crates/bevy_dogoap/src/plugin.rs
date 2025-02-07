@@ -19,7 +19,6 @@ impl Plugin for DogoapPlugin {
                     planner::handle_planner_tasks,
                 )
                     .chain(),
-            )
-            .register_type::<planner::Planner>();
+            );
     }
 }

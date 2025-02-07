@@ -20,6 +20,7 @@ where
     Action {
         key: name.to_string(),
         preconditions: vec![],
+        dynamic_preconditions: vec![],
         effects: vec![Effect {
             action: name.to_string(),
             mutators,

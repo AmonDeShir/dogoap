@@ -22,8 +22,7 @@ type DatumComponents = Vec<Box<dyn DatumComponent>>;
 
 /// Our main struct for handling the planning within Bevy, keeping track of added
 /// [`Action`]s, [`DatumComponent`]s, and some options for controlling the execution
-#[derive(Component, Reflect)]
-#[reflect(Component)]
+#[derive(Component)]
 pub struct Planner {
     /// Our current state used for planning, updated by [`update_planner_local_state`] which reads
     /// the current state from our Bevy world and updates it accordingly
@@ -38,10 +37,7 @@ pub struct Planner {
     // queue of action keys, first is current
     pub current_plan: VecDeque<String>,
 
-    // TODO figure out how to get reflect to work, if possible
-    #[reflect(ignore)]
     pub actions_map: ActionsMap,
-    #[reflect(ignore)]
     pub datum_components: DatumComponents,
 
     // Some additional fields to control the execution
@@ -256,10 +252,7 @@ pub fn handle_planner_tasks(
                     None => {}
                 }
             }
-            None => {
-                warn!("Didn't find any plan for our goal in Entity {}!", entity);
-                // warn!("No plan found");
-            }
+            None => {}
         }
         commands.entity(entity).remove::<IsPlanning>();
     }
