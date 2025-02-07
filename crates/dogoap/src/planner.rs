@@ -111,7 +111,7 @@ pub enum PlanningStrategy {
     /// Might take longer time than GoalToStart, but finds the path with the lowest cost
     StartToGoal,
     /// GoalToStart begins with the goal state, and works backwards from there, in order to find a path as quick as possible
-    /// Might lead to less-than-optimial paths, but should find a valid path quicker
+    /// Might lead to less-than-optimal paths, but should find a valid path quicker
     GoalToStart,
 }
 

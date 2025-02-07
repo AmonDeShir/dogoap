@@ -4,7 +4,7 @@ use std::collections::VecDeque;
 use std::{collections::HashMap, fmt};
 
 use bevy::prelude::*;
-
+use bevy::utils::HashSet;
 #[cfg(feature = "compute-pool")]
 use {
     std::time::Instant,
@@ -47,8 +47,6 @@ pub struct Planner {
     // Some additional fields to control the execution
     /// If the Planner should try to always come up with new plans based on the current goal
     pub always_plan: bool,
-    /// If the Planner should remove the current goal if it cannot find any plan to reach it
-    pub remove_goal_on_no_plan_found: bool,
     /// plan_next_tick works like a toggle, that once you've set it to true, it'll make a new plan once
     /// then turn it to false. Combine with always_plan set to false and you can manually decide when
     /// new plans should be made.
@@ -76,7 +74,7 @@ struct Task<T>(T);
 /// We do it in a asyncronous manner as make_plan blocks and if it takes 100ms, we'll delay frames
 /// by 100ms...
 #[derive(Component)]
-pub struct ComputePlan(Task<Option<(Vec<dogoap::prelude::Node>, usize)>>);
+pub struct ComputePlan(Task<(Option<(Vec<dogoap::prelude::Node>, usize)>, Option<Goal>)>);
 
 /// This Component gets added when the planner for an Entity is currently planning,
 /// and removed once a plan has been created. Normally this will take under 1ms,
@@ -104,16 +102,19 @@ impl Planner {
         Self {
             state,
             datum_components: components,
-            current_goal: goals.first().cloned(),
+            current_goal: None,
             goals,
             actions_map,
             current_action: None,
             current_plan: VecDeque::new(),
             always_plan: true,
-            remove_goal_on_no_plan_found: true,
             plan_next_tick: false,
             actions_for_dogoap,
         }
+    }
+
+    pub fn sort_goals(&mut self) {
+        self.goals.sort_by(|a,b| b.priority.cmp(&a.priority));
     }
 }
 
@@ -137,23 +138,32 @@ pub fn update_planner_local_state(
 /// and creates a new task for generating a new plan
 pub fn create_planner_tasks(
     mut commands: Commands,
-    query: Query<(Entity, &Planner), Without<ComputePlan>>,
+    mut query: Query<(Entity, &mut Planner), Without<ComputePlan>>,
 ) {
     #[cfg(feature = "compute-pool")]
     let thread_pool = AsyncComputeTaskPool::get();
 
-    for (entity, planner) in query.iter() {
+    for (entity, mut planner) in query.iter_mut() {
         if planner.always_plan {
-            if let Some(goal) = planner.current_goal.clone() {
-                let state = planner.state.clone();
-                let actions = planner.actions_for_dogoap.clone();
+            planner.sort_goals();
+            let state = planner.state.clone();
+            let actions = planner.actions_for_dogoap.clone();
+            let goals = planner.goals.clone();
 
-                #[cfg(feature = "compute-pool")]
-                let task = thread_pool.spawn(async move {
+            #[cfg(feature = "compute-pool")]
+            let task = thread_pool.spawn(async move {
+                let mut plan = None;
+                let mut current_goal = None;
+
+                for goal in goals.iter() {
                     let start = Instant::now();
 
+                    if check_goal(&state, goal) {
+                        continue;
+                    }
+
                     // WARN this is the part that can be slow for large search spaces and why we use AsyncComputePool
-                    let plan = make_plan(&state, &actions[..], &goal);
+                    plan = make_plan(&state, &actions[..], goal);
                     let duration_ms = start.elapsed().as_millis();
 
                     if duration_ms > 10 {
@@ -161,16 +171,22 @@ pub fn create_planner_tasks(
                         warn!("Planning duration for Entity {entity} was {duration_ms}ms for {steps} steps");
                     }
 
-                    plan
-                });
+                    if plan.iter().count() > 0 {
+                        current_goal = Some(goal.clone());
 
-                #[cfg(not(feature = "compute-pool"))]
-                let task = Task(make_plan(&state, &actions[..], &goal));
+                        break;
+                    }
+                }
 
-                commands
-                    .entity(entity)
-                    .insert((IsPlanning, ComputePlan(task)));
-            }
+                (plan, current_goal)
+            });
+
+            #[cfg(not(feature = "compute-pool"))]
+            let task = Task(make_plan(&state, &actions[..], &goal));
+
+            commands
+                .entity(entity)
+                .insert((IsPlanning, ComputePlan(task)));
         }
     }
 }
@@ -193,10 +209,12 @@ pub fn handle_planner_tasks(
         #[cfg(not(feature = "compute-pool"))]
         let p = grab_plan_from_task(&mut task.0);
         #[cfg(feature = "compute-pool")]
-        let p = match future::block_on(future::poll_once(&mut task.0)) {
+        let (p, current_goal) = match future::block_on(future::poll_once(&mut task.0)) {
             Some(r) => r,
             None => continue,
         };
+
+        planner.current_goal = current_goal;
 
         commands.entity(entity).remove::<ComputePlan>();
         match p {
@@ -235,12 +253,7 @@ pub fn handle_planner_tasks(
                         action_component.insert(&mut commands, entity);
                         planner.current_action = Some(found_action.clone());
                     }
-                    None => {
-                        if planner.remove_goal_on_no_plan_found {
-                            debug!("Seems there is nothing to be done, removing current goal");
-                            planner.current_goal = None;
-                        }
-                    }
+                    None => {}
                 }
             }
             None => {

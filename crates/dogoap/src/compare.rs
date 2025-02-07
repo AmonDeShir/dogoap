@@ -67,6 +67,7 @@ pub fn check_preconditions(state: &LocalState, action: &Action) -> bool {
     })
 }
 
+
 #[cfg(test)]
 mod test {
     use crate::compare::check_preconditions;
